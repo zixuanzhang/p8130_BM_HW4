@@ -1,0 +1,16 @@
+---
+title: "p8130 HW4 Regression"
+author: "Eleanor Zhang"
+date: "11/11/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(faraway)
+library(broom)
+library(tidyverse)
+library(HH) 
+```
+
+
