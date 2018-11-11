@@ -229,31 +229,41 @@ Test Statistic: $F_{test} = \frac{MSR}{MSE} = 30.05 \sim F(4, 42)$
 
 Decision Rule: at $\alpha = 0.05$, we will reject the null if $F_{test} > F(0.95,4,42) = 2.59$. Here we have $F_{test} = 30.05 > 2.59$, so we should reject the null and conclude that there is at least one linear association among these predictors with the outcome satisfaction level.
 
-Then we can test these predictors one by one: 
 
-1. Test for $\beta_{1}$: the coefficent of age
+### c) compute 95% CI for estimated coefficients
 
-State hypothesis: $H_{0}: \beta_{1} = 0$ vs. $H_{a}: \beta_{1} \ne 0$ 
+create a table with estimator and 95% Confidence Interval:
 
-Test statisitc: we can use the generalized F test for SLR which is equivalent to t test for single regression coefficient. $F_{test} = \frac{SSR_{L}/1}{SSE_{L}/(46-2)} = 81.8 \sim F(1, 44)$
+```{r}
+summary(MLR_all) %>% 
+  tidy %>% 
+  mutate(lower_bound = estimate - qt(0.975, 42) * std.error,
+         upper_bound = estimate + qt(0.975, 42) * std.error) %>% 
+  dplyr::select(term, estimate, std.error, lower_bound, upper_bound)
+```
 
-Decision rule: at $\alpha = 0.05$, we will reject the null if $F_{test} > F(1-\alpha, 2, 44) = 4.06$. Here we have $F_{test} = 81.8 > 4.06 $, with p value well below 0.001, so we will reject the null and conclude there is linear association between satisfaction score and age.
+Interpret severity of illness: 
 
-2. Test for $\beta_{2}$: the coefficent of Severity
+While holding age and anxiety level constant, the mean __decrease__ of satisfaction score with an unit increase in severity of illness is 0.442. We are 95% confident that the mean change of satisfaction score with one unit increase in severity of illness is between -1.43 to 0.551.
 
-State hypothesis: $H_{0}: \beta_{2} = 0$ vs. $H_{a}: \beta_{2} \ne 0$ 
 
-Test statisitc: $F_{test} = \frac{SSR_{X2|X1}/1}{SSE_{X1}/44} = 4.75 \sim F(1, 44)$
+### d) Obtain interval estimate for a new patient
 
-Rejection rule: we should reject the null if $F_{test} > 4.06$ at $\alpha = 0.05$. Here we have $F_{test} = 4.75 > 4.06$, so we should reject the null at $\alpha = 0.05$ and conclude there is linear association between Severity of illness and satisfaction level.
+```{r}
+new_data <- tibble(Age = 35,
+                   Severity = 42,
+                   Anxiety = 2.1)
+predict.lm(MLR_all, new_data, interval="confidence", conf.level = 0.95)
+```
 
-3. Test for $\beta_{3}$: the coefficent of Anxiety level
+Comment: The point estimator for this new patient's satisfaction score is 71.7. We are 95% confident that the predicted satisfaction score for this new patient will be between 64.2 to 79.1
+
+### e) test whether anxiety level can be dropped from the MLR
 
 State hypothesis: $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$
 
 Test statistic:  $F_{test} = \frac{SSR_{X3|X1,X2}/1}{SSE_{X1,X2}/43} = 3.6 \sim F(1, 43)$
 
 Rejection rule: at $\alpha = 0.05$, we should reject null if $F_{test} > F(0.95, 1,43) = 4.07$. However, we obtained $F_{test} = 3.6 < 4.07$, so we do not have evidence to reject the null. Therefore we should not include anxiety level as one of the explaintary variable since it does not reduce SSE significantly in a model with exisiting variables age and Severity of illness.
-
 
 
