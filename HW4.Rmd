@@ -5,6 +5,8 @@ date: "11/11/2018"
 output: 
      pdf_document:
          latex_engine: xelatex
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -72,4 +74,126 @@ hist(variable_set1$duration)
 ```
 
 Comment: age is slightly left skewed which means elder people have been overly sampled. The median of intervention is about 5 with large IQR of 5. drugs?. Commordities have median of 3.7 with large IQR 5. Duration of heart disease is roughly uniformly distributed from 50 to 350 days with median 165 days and IQR 240 days. Therefore, these co-variables are not normally distributed in the sample, so we need to adjust for this in later analysis.
+
+### b) investigate the shape of distribution for total cost
+
+raw data of total cost
+```{r}
+par(mfrow = c(1,2))
+hist(heart_disease$totalcost)
+boxplot(heart_disease$totalcost)
+abline(median(heart_disease$totalcost), 0, col = "red")
+```
+
+Then we try log transformation on __totalcost__ to see if this will transform the distribution.
+
+```{r}
+heart_disease <- mutate(heart_disease, log_totalcost = log(totalcost))
+par(mfrow = c(1,2))
+hist(heart_disease$log_totalcost)
+boxplot(heart_disease$log_totalcost)
+abline(median(heart_disease$log_totalcost), 0, col = "red")
+```
+
+comment: After log transformation, we saw a pretty good bell shape of the ditribution. So we will use this transformed data as needed.
+
+
+### c) dichotomize complications
+
+```{r}
+heart_disease <- heart_disease %>% 
+  mutate(comp_bin = ifelse(complications == 0, 0, 1))
+```
+
+### d) fit linear model SLR
+
+From part (b), we saw the transformed data look better in normal shape, we will use the transformed data to fit SLR. So we fit a simple linear regression model between outcome __log_totalcost__ and predictor __ERvisits__. Let $Y_{i}$ = response(total cost), $X_{i}$ = predictor (ERvisits).
+
+Then our model is $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$. Here it is reasonable to assume the error is normally distributed because the log transformation improve normality. then assume $\epsilon_{i} \sim N(0, \sigma^2)$
+
+```{r}
+# modify log transformed data
+heart_disease$log_totalcost[is.infinite(heart_disease$log_totalcost)] = 0
+SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
+summary(SLR)
+plot(heart_disease$ERvisits, heart_disease$log_totalcost)
+abline(SLR, col = "red", lwd = 2)
+```
+
+The result of regression tells that the fitted model is :
+
+$$\hat{logY_{i}} = 5.517 + 0.23X_{i}$$
+
+Interpretation: The fitted model indicates that for every unit increase in ER visits, the total cost in dollars on logarithm scale will increase by 0.23. when the ER visit is zero, the total cost in dollar on logarithm scale will be 5.517. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
+
+### e) fit MLR with comp_bin and ERvisits
+
+i) test if __comp_bin__ is an effect modifier of the relationship between __totalcost__ and __ERvisits__  
+
+Let $Y_{i}$ = response(total cost), $X_{i1}$ = predictor (ERvisits), $X_{i2}$ = {when comp_bin equals 1, otherwise equals 0}
+
+The full model is :  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \epsilon_{i}$  
+
+Now add in a potential modifier: $logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2}+ \beta_{3}X_{i1}X_{i2} + \epsilon_{i}$
+
+So our hypothesis statement is:  $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$  
+
+```{r}
+MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
+MLR_comp_inter <- lm(log_totalcost ~ ERvisits + comp_bin + ERvisits*comp_bin, data = heart_disease)
+summary(MLR_comp) %>% tidy
+summary(MLR_comp_inter) %>% tidy
+anova(MLR_comp, MLR_comp_inter)
+```
+
+Based on the regression result, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. So at 0.95 significance level, we do not have evidence to reject the null. Therefore we is no interaction or modifier effect of complications in the relationship between total cost and ER visits.
+
+To visualize interaction model:  
+
+```{r}
+range(heart_disease$ERvisits)
+ER <- seq(0,20,0.5)
+beta <- MLR_comp_inter$coefficients
+
+# comp_bin = 0
+yhat1 <- beta[1] + beta[2]*ER 
+# comp_bin greater than 0
+yhat2 <- beta[1] + beta[3] + (beta[2] + beta[4])*ER
+
+plot(heart_disease$ERvisits, heart_disease$log_totalcost)
+lines(ER, yhat1, col = 2, lwd = 2) # comp_bin = 0
+lines(ER, yhat2, col = 3, lwd = 2) # comp_bin greater than 0
+```
+
+ii) test if __comp_bin__ is a confounder of relationship between total cost and ERvisits
+
+Model 1 without comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$  
+
+Model 2 with comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \epsilon_{i}$
+
+```{r}
+SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
+MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
+anova(SLR, MLR_comp)
+```
+
+iii) decide if comp_bin should be included along with ERvisits
+
+### f) examine additional covariates 
+
+```{r}
+heart_disease %>% dplyr::select(log_totalcost, ERvisits, age, gender, duration) %>% pairs()
+```
+
+
+## Problem 3
+
+The investigators wants to test the relationship between patient's satisfaction (Y) and age, severity, and anxiety level. The dataset contains 46 patients observations
+
+### a) correlation matrix
+
+```{r}
+
+```
+
 
