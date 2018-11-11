@@ -2,7 +2,9 @@
 title: "p8130 HW4 Regression"
 author: "Eleanor Zhang"
 date: "11/11/2018"
-output: html_document
+output: 
+     pdf_document:
+         latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
@@ -13,4 +15,63 @@ library(tidyverse)
 library(HH) 
 ```
 
+## Problem 2 Heart disease
+
+We are interested in fi there is an association between __total cost__ in dollars diagnosed with heart disease and the __number of ER visits__. Other factors will be adjusted later on.
+
+### a) short description of data and look at the data
+
+```{r}
+heart_disease <- read_csv("./data/HeartDisease.csv")
+head(heart_disease)
+str(heart_disease)
+names(heart_disease)
+```
+
+In this dataset, there are `r nrow(heart_disease)` observations of patients with `r ncol(heart_disease)` variables:  
+
+*  __id__: patient id
+*  __totalcost__: total cost ($) of patients who are diagnosed with heart disease
+*  __age__: age of patients
+*  __interventions__: number of interventions (integers)
+*  __drugs__: ? number of drugs.
+*  __ERvisits__: number of ER visits
+*  __complications__: number of complications
+*  __comorbidities__: number of co-presence of other diseases in additional to heart disease
+*  __duration__: duration of heart disease (in days)
+
+Based our investigation interest, the main outcome is __total cost__ of patients with heart disease and the main predictor is __ERvisits__ (number of ER visits). Other important covariates also need to be considered because they could potential have differential effect on the association relationship between out main predictor and main outcome, including age, interventions, drugs used, complications, and duration of disease. We will first take a look at these variables:
+
+i) First we took a look at the main outcome and main predictor
+
+number summaries for variables:
+```{r}
+variable_set1 <- dplyr::select(heart_disease, totalcost, ERvisits, everything(), -c(id, gender, complications))
+variable_set2 <- dplyr::select(heart_disease, gender, complications)
+knitr::kable(summary(variable_set1))
+table(variable_set2)
+#margin.table(table(variable_set2))
+#prop.table(table(variable_set2))
+```
+
+Visualize the distribution of these variables
+
+```{r}
+par(mfrow = c(1,2))
+hist(variable_set1$totalcost)
+hist(variable_set1$ERvisits)
+```
+
+Comment: Since total cost and ER visits are both heavily right skewed on the histograms, we better use median and IQR in the summay table to describe them. Especially for total cost, there are many extreme values at the right tail end which needed to be investigated further in the following analysis.
+
+```{r}
+par(mfrow = c(2,3))
+hist(variable_set1$age)
+hist(variable_set1$interventions)
+hist(variable_set1$drugs)
+hist(variable_set1$comorbidities)
+hist(variable_set1$duration)
+```
+
+Comment: age is slightly left skewed which means elder people have been overly sampled. The median of intervention is about 5 with large IQR of 5. drugs?. Commordities have median of 3.7 with large IQR 5. Duration of heart disease is roughly uniformly distributed from 50 to 350 days with median 165 days and IQR 240 days. Therefore, these co-variables are not normally distributed in the sample, so we need to adjust for this in later analysis.
 
