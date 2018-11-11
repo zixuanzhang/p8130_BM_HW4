@@ -24,8 +24,6 @@ We are interested in fi there is an association between __total cost__ in dollar
 ```{r}
 heart_disease <- read_csv("./data/HeartDisease.csv")
 head(heart_disease)
-str(heart_disease)
-names(heart_disease)
 ```
 
 In this dataset, there are `r nrow(heart_disease)` observations of patients with `r ncol(heart_disease)` variables:  
