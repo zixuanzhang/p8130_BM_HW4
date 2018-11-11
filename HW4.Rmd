@@ -81,8 +81,7 @@ raw data of total cost
 ```{r}
 par(mfrow = c(1,2))
 hist(heart_disease$totalcost)
-boxplot(heart_disease$totalcost)
-abline(median(heart_disease$totalcost), 0, col = "red")
+qqnorm(heart_disease$totalcost)
 ```
 
 Then we try log transformation on __totalcost__ to see if this will transform the distribution.
@@ -91,8 +90,8 @@ Then we try log transformation on __totalcost__ to see if this will transform th
 heart_disease <- mutate(heart_disease, log_totalcost = log(totalcost))
 par(mfrow = c(1,2))
 hist(heart_disease$log_totalcost)
-boxplot(heart_disease$log_totalcost)
-abline(median(heart_disease$log_totalcost), 0, col = "red")
+heart_disease$log_totalcost[is.infinite(heart_disease$log_totalcost)] = 0
+qqnorm(heart_disease$log_totalcost)
 ```
 
 comment: After log transformation, we saw a pretty good bell shape of the ditribution. So we will use this transformed data as needed.
@@ -112,8 +111,6 @@ From part (b), we saw the transformed data look better in normal shape, we will 
 Then our model is $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$. Here it is reasonable to assume the error is normally distributed because the log transformation improve normality. then assume $\epsilon_{i} \sim N(0, \sigma^2)$
 
 ```{r}
-# modify log transformed data
-heart_disease$log_totalcost[is.infinite(heart_disease$log_totalcost)] = 0
 SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
 summary(SLR)
 plot(heart_disease$ERvisits, heart_disease$log_totalcost)
@@ -188,12 +185,75 @@ heart_disease %>% dplyr::select(log_totalcost, ERvisits, age, gender, duration) 
 
 ## Problem 3
 
-The investigators wants to test the relationship between patient's satisfaction (Y) and age, severity, and anxiety level. The dataset contains 46 patients observations
+The investigators wants to test the relationship between patient's satisfaction (Y) and age, severity of illness, and anxiety level. The dataset contains 46 patients observations
 
 ### a) correlation matrix
 
 ```{r}
-
+pat_sat <- readxl::read_excel("./data/PatSatisfaction.xlsx")
+head(pat_sat)
+pairs(pat_sat)
+hist(pat_sat$Safisfaction)
+hist(pat_sat$Age)
+hist(pat_sat$Severity)
+hist(pat_sat$Anxiety)
+cor(pat_sat) %>% knitr::kable()
 ```
+
+Comment: the correlation matrix shows that age, severity of illness and anxiety level are consistently negatively correlated with satisfaction score. Age seems to have the strongest correlation with satisfaction score while the other variables also have significant coefficient of correlations.
+
+### b) fit a MLR and test whether there is a regression relation
+
+In this MLR model, we will use the satisfaction as response while all other three variables as predictors. 
+Let $Y_{i}$ = satisfaction (outcome), $X_{i1}$ = age, $X_{i2}$ = severity of illness, $X_{i3}$ = anxiety level
+
+Full Model: $Y_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \beta_{2}X_{i2} + \epsilon_{i}$ 
+
+```{r}
+names(pat_sat)
+MLR_all <- lm(Safisfaction ~ Age + Severity + Anxiety, data = pat_sat)
+summary(MLR_all)
+anova(MLR_all)
+```
+
+First We need to do an overall F test for the three predictors:
+
+```{r}
+summary(MLR_all)
+```
+
+State the hypothesis: 
+$$H_{0}: \beta_{1} = \beta_{2} = \beta_{3} = 0 \\ H_{a}: \text{at least one of the coefficient is nonzero}$$
+
+Test Statistic: $F_{test} = \frac{MSR}{MSE} = 30.05 \sim F(4, 42)$
+
+Decision Rule: at $\alpha = 0.05$, we will reject the null if $F_{test} > F(0.95,4,42) = 2.59$. Here we have $F_{test} = 30.05 > 2.59$, so we should reject the null and conclude that there is at least one linear association among these predictors with the outcome satisfaction level.
+
+Then we can test these predictors one by one: 
+
+1. Test for $\beta_{1}$: the coefficent of age
+
+State hypothesis: $H_{0}: \beta_{1} = 0$ vs. $H_{a}: \beta_{1} \ne 0$ 
+
+Test statisitc: we can use the generalized F test for SLR which is equivalent to t test for single regression coefficient. $F_{test} = \frac{SSR_{L}/1}{SSE_{L}/(46-2)} = 81.8 \sim F(1, 44)$
+
+Decision rule: at $\alpha = 0.05$, we will reject the null if $F_{test} > F(1-\alpha, 2, 44) = 4.06$. Here we have $F_{test} = 81.8 > 4.06 $, with p value well below 0.001, so we will reject the null and conclude there is linear association between satisfaction score and age.
+
+2. Test for $\beta_{2}$: the coefficent of Severity
+
+State hypothesis: $H_{0}: \beta_{2} = 0$ vs. $H_{a}: \beta_{2} \ne 0$ 
+
+Test statisitc: $F_{test} = \frac{SSR_{X2|X1}/1}{SSE_{X1}/44} = 4.75 \sim F(1, 44)$
+
+Rejection rule: we should reject the null if $F_{test} > 4.06$ at $\alpha = 0.05$. Here we have $F_{test} = 4.75 > 4.06$, so we should reject the null at $\alpha = 0.05$ and conclude there is linear association between Severity of illness and satisfaction level.
+
+3. Test for $\beta_{3}$: the coefficent of Anxiety level
+
+State hypothesis: $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$
+
+Test statistic:  $F_{test} = \frac{SSR_{X3|X1,X2}/1}{SSE_{X1,X2}/43} = 3.6 \sim F(1, 43)$
+
+Rejection rule: at $\alpha = 0.05$, we should reject null if $F_{test} > F(0.95, 1,43) = 4.07$. However, we obtained $F_{test} = 3.6 < 4.07$, so we do not have evidence to reject the null. Therefore we should not include anxiety level as one of the explaintary variable since it does not reduce SSE significantly in a model with exisiting variables age and Severity of illness.
+
 
 
