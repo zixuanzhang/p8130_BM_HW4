@@ -2,11 +2,10 @@
 title: "p8130 HW4 Regression"
 author: "Eleanor Zhang"
 date: "11/11/2018"
+geometry: margin=2cm
 output: 
      pdf_document:
          latex_engine: xelatex
-editor_options: 
-  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -20,10 +19,13 @@ library(tidyverse)
 
 We are interested in fi there is an association between __total cost__ in dollars diagnosed with heart disease and the __number of ER visits__. Other factors will be adjusted later on.
 
+
 ### a) short description of data and look at the data
 
-```{r}
-heart_disease <- read_csv("./data/HeartDisease.csv")
+```{r read data}
+heart_disease <- read_csv("./data/HeartDisease.csv") %>% 
+  mutate(gender = as.factor(gender),
+         complications = as.factor(complications))
 head(heart_disease)
 ```
 
@@ -32,121 +34,127 @@ In this dataset, there are `r nrow(heart_disease)` observations of patients with
 *  __id__: patient id
 *  __totalcost__: total cost ($) of patients who are diagnosed with heart disease
 *  __age__: age of patients
+*  __gender__: gender of patient
 *  __interventions__: number of interventions (integers)
-*  __drugs__: ? number of drugs.
+*  __drugs__: number of drugs the patients take.
 *  __ERvisits__: number of ER visits
 *  __complications__: number of complications
 *  __comorbidities__: number of co-presence of other diseases in additional to heart disease
 *  __duration__: duration of heart disease (in days)
 
-Based our investigation interest, the main outcome is __total cost__ of patients with heart disease and the main predictor is __ERvisits__ (number of ER visits). Other important covariates also need to be considered because they could potential have differential effect on the association relationship between out main predictor and main outcome, including age, interventions, drugs used, complications, and duration of disease. We will first take a look at these variables:
+Based our investigation interest, the main outcome is __total cost__ of patients with heart disease and the main predictor is __ERvisits__ (number of ER visits). Other important covariates also need to be considered because they could potentially have effect on the association relationship between our main predictor and main outcome, including age, interventions, drugs used, complications, and duration of disease. We will first take a look at the availible variables:
 
 i) First we took a look at the main outcome and main predictor
 
-number summaries for variables:
-```{r}
+```{r number summary}
 variable_set1 <- dplyr::select(heart_disease, totalcost, ERvisits, everything(), -c(id, gender, complications))
 variable_set2 <- dplyr::select(heart_disease, gender, complications)
 knitr::kable(summary(variable_set1))
-table(variable_set2)
-#margin.table(table(variable_set2))
-#prop.table(table(variable_set2))
+knitr::kable(summary(variable_set2))
 ```
 
-Visualize the distribution of these variables
+Visualize the distribution of these variables:
 
-```{r}
+```{r, fig.width=10}
 par(mfrow = c(1,2))
-hist(variable_set1$totalcost)
-hist(variable_set1$ERvisits)
+hist(variable_set1$totalcost, main = "histogram of total cost (outcome)")
+hist(variable_set1$ERvisits, main = "histogram of ER visits")
 ```
 
-Comment: Since total cost and ER visits are both heavily right skewed on the histograms, we better use median and IQR in the summay table to describe them. Especially for total cost, there are many extreme values at the right tail end which needed to be investigated further in the following analysis.
+Describe the main outcome and main predictor:  
+Since total cost and ER visits are both heavily right skewed on the histograms, we better use median and IQR in the summay table to describe them. Especially for total cost, there are many extreme values at the right tail end which needed to be investigated further in the following analysis. We categorized two other remaining variables gender and complications as categorical variables. From the summary table, we saw 
 
-```{r}
+```{r, fig.width=10}
 par(mfrow = c(2,3))
-hist(variable_set1$age)
-hist(variable_set1$interventions)
-hist(variable_set1$drugs)
-hist(variable_set1$comorbidities)
-hist(variable_set1$duration)
+hist(variable_set1$age, main = "histogram of age")
+hist(variable_set1$interventions, main = "histogram of interventions")
+hist(variable_set1$drugs, main = "histogram of drugs")
+hist(variable_set1$comorbidities, main = "histogram of comordities")
+hist(variable_set1$duration, main = "histogram of duration")
 ```
 
-Comment: age is slightly left skewed which means elder people have been overly sampled. The median of intervention is about 5 with large IQR of 5. drugs?. Commordities have median of 3.7 with large IQR 5. Duration of heart disease is roughly uniformly distributed from 50 to 350 days with median 165 days and IQR 240 days. Therefore, these co-variables are not normally distributed in the sample, so we need to adjust for this in later analysis.
+Describe other covariables: age is slightly left skewed which means elder people have been overly sampled. The median of intervention is about 5 with large IQR of 5. drugs?. Commordities have median of 3.7 with large IQR 5. Duration of heart disease is roughly uniformly distributed from 50 to 350 days with median 165 days and IQR 240 days. Therefore, these co-variables are not normally distributed in the sample. We categorized two other remaining variables gender and complications as categorical variables. From the summary table, we saw one sex is oversampled (608). The majority of patients do not have any complications.
 
 ### b) investigate the shape of distribution for total cost
 
-raw data of total cost
+First we examined the distribution of raw data of total cost and check its normality:
+
 ```{r}
 par(mfrow = c(1,2))
-hist(heart_disease$totalcost)
+hist(heart_disease$totalcost, main = "histogram of total cost")
 qqnorm(heart_disease$totalcost)
 ```
 
-Then we try log transformation on __totalcost__ to see if this will transform the distribution.
+Then we try log transformation on __totalcost__ to see if this will improve the normality.
 
 ```{r}
 heart_disease <- mutate(heart_disease, log_totalcost = log(totalcost))
 par(mfrow = c(1,2))
-hist(heart_disease$log_totalcost)
-heart_disease$log_totalcost[is.infinite(heart_disease$log_totalcost)] = 0
+hist(heart_disease$log_totalcost, main = "histogram of log total cost")
+heart_disease$log_totalcost[is.infinite(heart_disease$log_totalcost)] = 0.001
 qqnorm(heart_disease$log_totalcost)
+qqline(heart_disease$log_totalcost, col = "red", lwd = 2)
 ```
 
-comment: After log transformation, we saw a pretty good bell shape of the ditribution. So we will use this transformed data as needed.
+Comment: After log transformation, we saw a pretty good bell shaped ditribution. So we will use this transformed data in the linear model fitting and interpretation.
 
 
 ### c) dichotomize complications
 
+0 represents no complications; 1 represents having complications
+
 ```{r}
 heart_disease <- heart_disease %>% 
   mutate(comp_bin = ifelse(complications == 0, 0, 1))
+heart_disease %>% ggplot(aes(x = comp_bin)) + geom_bar()
 ```
 
-### d) fit linear model SLR
+### d) fit linear model SLR 
 
 From part (b), we saw the transformed data look better in normal shape, we will use the transformed data to fit SLR. So we fit a simple linear regression model between outcome __log_totalcost__ and predictor __ERvisits__. Let $Y_{i}$ = response(total cost), $X_{i}$ = predictor (ERvisits).
 
-Then our model is $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$. Here it is reasonable to assume the error is normally distributed because the log transformation improve normality. then assume $\epsilon_{i} \sim N(0, \sigma^2)$
+Then our model is $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$. Here we assume the error is normally distribued. then $\epsilon_{i} \sim N(0, \sigma^2)$
 
-```{r}
+```{r SLR}
 SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
 summary(SLR)
 plot(heart_disease$ERvisits, heart_disease$log_totalcost)
-abline(SLR, col = "red", lwd = 2)
+abline(SLR, col = "blue", lwd = 2)
 ```
 
 The result of regression tells that the fitted model is :
 
 $$\hat{logY_{i}} = 5.517 + 0.23X_{i}$$
 
-Interpretation: The fitted model indicates that for every unit increase in ER visits, the mean total cost in dollars on logarithm scale will increase by 0.23. when the ER visit is zero, the mean total cost in dollar on logarithm scale will be 5.517. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
+Interpretation: The fitted model indicates that for every unit increase in ER visits, the expected total cost in dollars _on logarithm scale_ will increase by 0.23. When the ER visit is 0, the expected total cost in dollar _on logarithm scale_ will be 5.517. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
 
 ### e) fit MLR with comp_bin and ERvisits
 
 i) test if __comp_bin__ is an effect modifier of the relationship between __totalcost__ and __ERvisits__  
 
-Let $Y_{i}$ = response(total cost), $X_{i1}$ = predictor (ERvisits), $X_{i2}$ = {when comp_bin equals 1, otherwise equals 0}
+Let $Y_{i}$ = response(total cost), $X_{i1}$ = predictor (ERvisits), $X_{i2}$ = comp_bin(factor with two levels)
 
-The full model is :  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \epsilon_{i}$  
+The full model is :  
 
-Now add in a potential modifier: $logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2}+ \beta_{3}X_{i1}X_{i2} + \epsilon_{i}$
+$logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2} + \epsilon_{i}$  
 
-So our hypothesis statement is:  $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$
+Now add a potential modifier (interaction):  
 
-then fit two models
-```{r}
+$logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2}+ \beta_{3}X_{i1}X_{i2} + \epsilon_{i}$
+
+Our hypothesis statement is:  $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$
+
+```{r modifier effect}
 MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
 MLR_comp_inter <- lm(log_totalcost ~ ERvisits + comp_bin + ERvisits*comp_bin, data = heart_disease)
-summary(MLR_comp) %>% tidy
-summary(MLR_comp_inter) %>% tidy
-anova(MLR_comp, MLR_comp_inter)
+summary(MLR_comp_inter) %>% tidy %>% knitr::kable()
+anova(MLR_comp, MLR_comp_inter) %>% tidy
 ```
 
 
-Based on the regression result, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. So at 0.95 significance level, we do not have evidence to reject the null. Therefore we is no interaction or modifier effect of complications in the relationship between total cost and ER visits.
+Comment: Based on the regression summary and anova result, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. Anova F test for comparing two models indicate adding the interaction term does not increase SSR by significant amount. So at 0.95 significance level, we do not have evidence to reject the null. Therefore we is no interaction or modifier effect of complications in the relationship between total cost and ER visits.
 
-To visualize interaction model:  
+We can also visualize this interaction model:  
 
 ```{r}
 range(heart_disease$ERvisits)
@@ -163,6 +171,8 @@ lines(ER, yhat1, col = 2, lwd = 2) # total cost of comp_bin = 0 with fixed ER
 lines(ER, yhat2, col = 3, lwd = 2) # total cost of comp_bin greater than 0 with fixed ER
 ```
 
+Comment: although we expect two parallel lines on the plot if there is truly no interaction effect. However, the statistical test we conduced above indicate that although there is some interaction effect, the effect is not significant at
+
 ii) test if __comp_bin__ is a confounder of relationship between total cost and ERvisits
 
 Model 1 without comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$  
@@ -174,7 +184,10 @@ cor(heart_disease$log_totalcost, heart_disease$ERvisits)
 cor(heart_disease$comp_bin, heart_disease$ERvisits)
 SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
 MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
+SLR %>% tidy
+MLR_comp %>% tidy
 anova(SLR, MLR_comp)
+(0.226 - 0.203)/ 0.226
 ```
 
 iii) decide if comp_bin should be included along with ERvisits
