@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(faraway)
 library(broom)
 library(tidyverse)
+library(HH)
 ```
 
 ## Problem 2 Heart disease
@@ -103,7 +104,7 @@ Comment: After log transformation, we saw a pretty good bell shaped ditribution.
 
 0 represents no complications; 1 represents having complications
 
-```{r}
+```{r fig.width=5, fig.height=3}
 heart_disease <- heart_disease %>% 
   mutate(comp_bin = ifelse(complications == 0, 0, 1))
 heart_disease %>% ggplot(aes(x = comp_bin)) + geom_bar()
@@ -156,48 +157,86 @@ Comment: Based on the regression summary and anova result, p value for the inter
 
 We can also visualize this interaction model:  
 
-```{r}
+```{r interaction model}
 range(heart_disease$ERvisits)
 ER <- seq(0,20,0.5)
 beta <- MLR_comp_inter$coefficients
-
 # comp_bin = 0
 yhat1 <- beta[1] + beta[2]*ER 
 # comp_bin = 1
 yhat2 <- beta[1] + beta[3] + (beta[2] + beta[4])*ER
 
-plot(heart_disease$ERvisits, heart_disease$log_totalcost)
+plot(heart_disease$ERvisits, heart_disease$log_totalcost, 
+     main = "(log) total cost with complications and no complications",
+     xlab = "")
 lines(ER, yhat1, col = 2, lwd = 2) # total cost of comp_bin = 0 with fixed ER
 lines(ER, yhat2, col = 3, lwd = 2) # total cost of comp_bin greater than 0 with fixed ER
 ```
 
-Comment: although we expect two parallel lines on the plot if there is truly no interaction effect. However, the statistical test we conduced above indicate that although there is some interaction effect, the effect is not significant at
+Comment: although we expect two parallel lines on the plot if there is truly no interaction effect. However, the statistical test we conducted above indicate that although there is some interaction effect, the effect is not significant. As a conclusion, we will not consider this mediator effect.
 
 ii) test if __comp_bin__ is a confounder of relationship between total cost and ERvisits
 
 Model 1 without comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$  
 
-Model 2 with comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \epsilon_{i}$
+Model 2 with comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2} + \epsilon_{i}$
 
 ```{r}
-cor(heart_disease$log_totalcost, heart_disease$ERvisits)
-cor(heart_disease$comp_bin, heart_disease$ERvisits)
+comp_ER <- cor(heart_disease$comp_bin, heart_disease$ERvisits)
+comp_total <- cor(heart_disease$comp_bin, heart_disease$log_totalcost)
 SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
-MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
-SLR %>% tidy
-MLR_comp %>% tidy
+MLR_comp <- lm(log_totalcost ~ ERvisits + factor(comp_bin), data = heart_disease)
+SLR %>% tidy %>% knitr::kable()
+MLR_comp %>% tidy %>% knitr::kable()
 anova(SLR, MLR_comp)
 (0.226 - 0.203)/ 0.226
 ```
 
+Comment: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
+
 iii) decide if comp_bin should be included along with ERvisits
+
+From above test, we should include __comp_bin__ as a predictor in our additive linear model. Adding __com_bin__ in the model increase SSR significantly. The coefficient of __comp_bin__ is also significant in the linear model from above discussion.
 
 ### f) examine additional covariates 
 
+(i)  fit a MLR  
+
+We start with screen for any colinearility of variables among __ERvisits__, __comp_bin__, __age__, __gender__, and __duration__
+
 ```{r}
-heart_disease %>% dplyr::select(log_totalcost, ERvisits, age, gender, duration) %>% pairs()
+heart_disease %>% dplyr::select(log_totalcost, ERvisits, comp_bin, age, gender, duration) %>% pairs()
 ```
 
+Then we fit a MLR with all variables of interests: 
+
+```{r}
+fit_all <- lm(log_totalcost ~ ERvisits + comp_bin + age + factor(gender) + duration, 
+              data = heart_disease)
+summary(fit_all) 
+vif(fit_all)
+```
+
+Comment: From the VIF test, there is no significant colinearity between predictors. Based on the t test statistics for each regression coefficients along with their p values, we observe linear relationship between gender and total cost is weak. Then we will perform ANOVA test and make decision.
+
+(ii) compare SLR and MLR  
+
+Here we construct several nested MLR to determine if we want to include the predicor in the model or not.
+
+```{r}
+anova(fit_all)
+```
+
+Comment: From F test for each nested model indicate that we should definitely include __duration__ in our model and better exclude age and gender since they do not much additional information in the exisiting model. Therefore from all above analysis, we come up with a fitted model of main outcome with its main predictor along with other covariates is the follow:  
+
+```{r}
+MLR_final <- lm(log_totalcost ~ ERvisits + comp_bin + duration, 
+              data = heart_disease)
+summary(MLR_final)
+```
+
+
+total cost (log) = 4.7 + 0.17ERvisit + 1.55comp_bin + 0.0056duration
 
 ## Problem 3
 
@@ -207,41 +246,30 @@ The investigators wants to test the relationship between patient's satisfaction 
 
 ```{r}
 pat_sat <- readxl::read_excel("./data/PatSatisfaction.xlsx")
-head(pat_sat)
 pairs(pat_sat)
-hist(pat_sat$Safisfaction)
-hist(pat_sat$Age)
-hist(pat_sat$Severity)
-hist(pat_sat$Anxiety)
 cor(pat_sat) %>% knitr::kable()
 ```
 
-Comment: the correlation matrix shows that age, severity of illness and anxiety level are consistently negatively correlated with satisfaction score. Age seems to have the strongest correlation with satisfaction score while the other variables also have significant coefficient of correlations.
+Comment: the correlation matrix shows that age, severity of illness and anxiety level are consistently negatively correlated with satisfaction score. Age seems to have the strongest correlation with satisfaction score while the other variables also have significant coefficient of correlations. However, covariates are positively correlated with each other significantly as well. So we should keep this in mind.
 
 ### b) fit a MLR and test whether there is a regression relation
 
 In this MLR model, we will use the satisfaction as response while all other three variables as predictors. 
 Let $Y_{i}$ = satisfaction (outcome), $X_{i1}$ = age, $X_{i2}$ = severity of illness, $X_{i3}$ = anxiety level
 
-Full Model: $Y_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \beta_{2}X_{i2} + \epsilon_{i}$ 
+Full Model: $Y_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2} + \beta_{2}X_{i2} + \epsilon_{i}$ 
 
 ```{r}
-names(pat_sat)
 MLR_all <- lm(Safisfaction ~ Age + Severity + Anxiety, data = pat_sat)
 summary(MLR_all)
-anova(MLR_all)
 ```
 
 First We need to do an overall F test for the three predictors:
 
-```{r}
-summary(MLR_all)
-```
-
-State the hypothesis: 
+State the hypothesis:  
 $$H_{0}: \beta_{1} = \beta_{2} = \beta_{3} = 0 \\ H_{a}: \text{at least one of the coefficient is nonzero}$$
 
-Test Statistic: $F_{test} = \frac{MSR}{MSE} = 30.05 \sim F(3, 42)$
+Test Statistic: $F_{test} = \frac{MSR}{MSE} = \frac{9120.5/3}{4248.8/42} = 30.05 \sim F(3, 42)$
 
 Decision Rule: at $\alpha = 0.05$, we will reject the null if $F_{test} > F(0.95,3,42) = 2.83$. Here we have $F_{test} = 30.05 > 2.83$, so we should reject the null and conclude that there is at least one linear association among these predictors with the outcome satisfaction level.
 
@@ -260,7 +288,7 @@ summary(MLR_all) %>%
 
 Interpret severity of illness: 
 
-While holding age and anxiety level constant, the mean __decrease__ of satisfaction score with an unit increase in severity of illness is 0.442. We are 95% confident that the true mean change of satisfaction score with one unit increase in severity of illness is between -1.43 to 0.551.
+While holding age and anxiety level constant, the expected __decrease__ of satisfaction score with an unit increase in severity of illness is 0.442. We are 95% confident that the true mean change of satisfaction score with one unit increase in severity of illness is between -1.43 to 0.551.
 
 
 ### d) Obtain interval estimate for a new patient
@@ -278,8 +306,19 @@ Comment: The point estimator for this new patient's satisfaction score is 71.7. 
 
 State hypothesis: $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$
 
-Test statistic:  $F_{test} = \frac{SSR_{X3|X1,X2}/1}{SSE_{X1,X2}/43} = 3.6 \sim F(1, 43)$
+Test statistic:  $F_{test} = \frac{SSR_{X3|X1,X2}/1}{SSE_{X1,X2}/43} = \frac{364.16}{4613/43} = 3.6 \sim F(1, 43)$
 
-Rejection rule: at $\alpha = 0.05$, we should reject null if $F_{test} > F(0.95, 1,43) = 4.07$. However, we obtained $F_{test} = 3.6 < 4.07$, so we do not have evidence to reject the null. Therefore we should not include anxiety level as one of the explaintary variable since it does not reduce SSE significantly in a model with exisiting variables age and Severity of illness.
+Rejection rule: at $\alpha = 0.05$, we should reject null if $F_{test} > F(0.95, 1,43) = 4.07$. However, we obtained $F_{test} = 3.6 < 4.07$, so we do not have evidence to reject the null. Therefore we should not include anxiety level as one of the explaintary variable since it does not reduce SSTO significantly in a model with exisiting variables age and Severity of illness.
+
+Perform test in R:
+```{r}
+MLR_Age_Sev <- lm(Safisfaction ~ Age + Severity, data = pat_sat)
+MLR_all <- lm(Safisfaction ~ Age + Severity + Anxiety, data = pat_sat)
+anova(MLR_Age_Sev) %>% tidy
+anova(MLR_all) %>% tidy
+anova(MLR_Age_Sev, MLR_all) %>% tidy
+```
+
+
 
 
