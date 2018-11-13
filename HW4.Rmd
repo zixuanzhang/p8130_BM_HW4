@@ -14,7 +14,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(faraway)
 library(broom)
 library(tidyverse)
-library(HH) 
 ```
 
 ## Problem 2 Heart disease
@@ -121,7 +120,7 @@ The result of regression tells that the fitted model is :
 
 $$\hat{logY_{i}} = 5.517 + 0.23X_{i}$$
 
-Interpretation: The fitted model indicates that for every unit increase in ER visits, the total cost in dollars on logarithm scale will increase by 0.23. when the ER visit is zero, the total cost in dollar on logarithm scale will be 5.517. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
+Interpretation: The fitted model indicates that for every unit increase in ER visits, the mean total cost in dollars on logarithm scale will increase by 0.23. when the ER visit is zero, the mean total cost in dollar on logarithm scale will be 5.517. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
 
 ### e) fit MLR with comp_bin and ERvisits
 
@@ -133,8 +132,9 @@ The full model is :  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \e
 
 Now add in a potential modifier: $logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2}+ \beta_{3}X_{i1}X_{i2} + \epsilon_{i}$
 
-So our hypothesis statement is:  $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$  
+So our hypothesis statement is:  $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$
 
+then fit two models
 ```{r}
 MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
 MLR_comp_inter <- lm(log_totalcost ~ ERvisits + comp_bin + ERvisits*comp_bin, data = heart_disease)
@@ -142,6 +142,7 @@ summary(MLR_comp) %>% tidy
 summary(MLR_comp_inter) %>% tidy
 anova(MLR_comp, MLR_comp_inter)
 ```
+
 
 Based on the regression result, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. So at 0.95 significance level, we do not have evidence to reject the null. Therefore we is no interaction or modifier effect of complications in the relationship between total cost and ER visits.
 
@@ -154,12 +155,12 @@ beta <- MLR_comp_inter$coefficients
 
 # comp_bin = 0
 yhat1 <- beta[1] + beta[2]*ER 
-# comp_bin greater than 0
+# comp_bin = 1
 yhat2 <- beta[1] + beta[3] + (beta[2] + beta[4])*ER
 
 plot(heart_disease$ERvisits, heart_disease$log_totalcost)
-lines(ER, yhat1, col = 2, lwd = 2) # comp_bin = 0
-lines(ER, yhat2, col = 3, lwd = 2) # comp_bin greater than 0
+lines(ER, yhat1, col = 2, lwd = 2) # total cost of comp_bin = 0 with fixed ER
+lines(ER, yhat2, col = 3, lwd = 2) # total cost of comp_bin greater than 0 with fixed ER
 ```
 
 ii) test if __comp_bin__ is a confounder of relationship between total cost and ERvisits
@@ -169,6 +170,8 @@ Model 1 without comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$
 Model 2 with comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \beta_{2}X_{i2} + \epsilon_{i}$
 
 ```{r}
+cor(heart_disease$log_totalcost, heart_disease$ERvisits)
+cor(heart_disease$comp_bin, heart_disease$ERvisits)
 SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
 MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
 anova(SLR, MLR_comp)
@@ -225,9 +228,9 @@ summary(MLR_all)
 State the hypothesis: 
 $$H_{0}: \beta_{1} = \beta_{2} = \beta_{3} = 0 \\ H_{a}: \text{at least one of the coefficient is nonzero}$$
 
-Test Statistic: $F_{test} = \frac{MSR}{MSE} = 30.05 \sim F(4, 42)$
+Test Statistic: $F_{test} = \frac{MSR}{MSE} = 30.05 \sim F(3, 42)$
 
-Decision Rule: at $\alpha = 0.05$, we will reject the null if $F_{test} > F(0.95,4,42) = 2.59$. Here we have $F_{test} = 30.05 > 2.59$, so we should reject the null and conclude that there is at least one linear association among these predictors with the outcome satisfaction level.
+Decision Rule: at $\alpha = 0.05$, we will reject the null if $F_{test} > F(0.95,3,42) = 2.83$. Here we have $F_{test} = 30.05 > 2.83$, so we should reject the null and conclude that there is at least one linear association among these predictors with the outcome satisfaction level.
 
 
 ### c) compute 95% CI for estimated coefficients
@@ -244,7 +247,7 @@ summary(MLR_all) %>%
 
 Interpret severity of illness: 
 
-While holding age and anxiety level constant, the mean __decrease__ of satisfaction score with an unit increase in severity of illness is 0.442. We are 95% confident that the mean change of satisfaction score with one unit increase in severity of illness is between -1.43 to 0.551.
+While holding age and anxiety level constant, the mean __decrease__ of satisfaction score with an unit increase in severity of illness is 0.442. We are 95% confident that the true mean change of satisfaction score with one unit increase in severity of illness is between -1.43 to 0.551.
 
 
 ### d) Obtain interval estimate for a new patient
@@ -253,10 +256,10 @@ While holding age and anxiety level constant, the mean __decrease__ of satisfact
 new_data <- tibble(Age = 35,
                    Severity = 42,
                    Anxiety = 2.1)
-predict.lm(MLR_all, new_data, interval="confidence", conf.level = 0.95)
+predict.lm(MLR_all, new_data, interval="prediction", conf.level = 0.95)
 ```
 
-Comment: The point estimator for this new patient's satisfaction score is 71.7. We are 95% confident that the predicted satisfaction score for this new patient will be between 64.2 to 79.1
+Comment: The point estimator for this new patient's satisfaction score is 71.7. We are 95% confident that the predicted satisfaction score for this new patient will be between 50.1 to 93.3
 
 ### e) test whether anxiety level can be dropped from the MLR
 
