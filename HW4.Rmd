@@ -23,7 +23,7 @@ We are interested in fi there is an association between __total cost__ in dollar
 
 ### a) short description of data and look at the data
 
-```{r read data}
+```{r read data, message=FALSE, warning=FALSE}
 heart_disease <- read_csv("./data/HeartDisease.csv") %>% 
   mutate(gender = as.factor(gender),
          complications = as.factor(complications))
@@ -48,7 +48,8 @@ Based our investigation interest, the main outcome is __total cost__ of patients
 i) First we took a look at the main outcome and main predictor
 
 ```{r number summary}
-variable_set1 <- dplyr::select(heart_disease, totalcost, ERvisits, everything(), -c(id, gender, complications))
+variable_set1 <- dplyr::select(heart_disease, totalcost, ERvisits, everything(), 
+                               -c(id, gender, complications))
 variable_set2 <- dplyr::select(heart_disease, gender, complications)
 knitr::kable(summary(variable_set1))
 knitr::kable(summary(variable_set2))
@@ -86,7 +87,7 @@ hist(heart_disease$totalcost, main = "histogram of total cost")
 qqnorm(heart_disease$totalcost)
 ```
 
-Then we try log transformation on __totalcost__ to see if this will improve the normality.
+Then we try __log transformation__ on totalcost to see if this will improve the normality.
 
 ```{r}
 heart_disease <- mutate(heart_disease, log_totalcost = log(totalcost))
@@ -189,7 +190,6 @@ MLR_comp <- lm(log_totalcost ~ ERvisits + factor(comp_bin), data = heart_disease
 SLR %>% tidy %>% knitr::kable()
 MLR_comp %>% tidy %>% knitr::kable()
 anova(SLR, MLR_comp)
-(0.226 - 0.203)/ 0.226
 ```
 
 Comment: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
