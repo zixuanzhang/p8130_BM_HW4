@@ -133,7 +133,7 @@ The result of regression tells that the fitted model is :
 
 $$\hat{logY_{i}} = 5.517 + 0.23X_{i}$$
 
-__Results and Interpretation__: The fitted model indicates that for every unit increase in ER visits, the expected total cost in dollars _on logarithm scale_ will increase by 0.23, or 1.26 on original scale. When the ER visit is 0, the expected total cost in dollar _on logarithm scale_ will be 5.517, or 249 dollars. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
+__Results and Interpretation__: In order to interpret the slope coefficient, we need to transform the response back to its original scale and interpret. After transformation, the mean reponse Yi will multiply by 1.26 for every increase in ER visit. When the ER visit is 0, the expected total cost in dollar _on logarithm scale_ will be 249 dollars on original scale. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
 
 ### e) fit MLR with comp_bin and ERvisits
 
@@ -196,7 +196,7 @@ summary(MLR_comp)
 anova(SLR, MLR_comp) %>% tidy
 ```
 
-__Comment__: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. If we calculate the F statistics for this nested model: $F = \frac{(SSR_{large} - SSR_{small})/1}{SSE_{large}/785} = \frac{116.6}{2464.668/785} = 37.14 \sim F(1, 785)$, then we will reject the null at 0.05 level since this test statistics is very large. In addition, the adjusted $R^2$ increased when adjusting for __comp_bin__. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
+__Comment__: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. If we calculate the F statistics for this nested model: $F = \frac{(SSR_{large} - SSR_{small})/1}{SSE_{large}/785} = \frac{116.6}{2464.668/785} = 37.14 \sim F(1, 785)$, then we will reject the null at 0.05 level since this test statistics is very large. In addition, the adjusted $R^2$ increased when adjusting for __comp_bin__. The slope of ERvisits changes from 0.225 to 0.2 (change by 11%), which is significant. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
 
 iii) decide if comp_bin should be included along with ERvisits
 
@@ -270,6 +270,14 @@ __Comment__: Since the investigators are primarily interested in the assoication
 
 __total cost (log) ~ 0.17ERvisits + 1.545comp_bin + 0.0056duration__
 
+then we check the assumption again:
+
+```{r}
+par(mfrow=c(2,2))
+plot(modelfit_3)
+```
+
+Comment: The assumption seems to be satisfied in our 3 predictor model stated above. So it is valid to use that model to descibe the association between total cost and predictors.
 
 ## Problem 3
 
