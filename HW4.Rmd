@@ -14,11 +14,12 @@ library(faraway)
 library(broom)
 library(tidyverse)
 library(HH)
+library(leaps)
 ```
 
 ## Problem 2 Heart disease
 
-We are interested in fi there is an association between __total cost__ in dollars diagnosed with heart disease and the __number of ER visits__. Other factors will be adjusted later on.
+We are interested in if there is an association between __total cost__ in dollars diagnosed with heart disease and the __number of ER visits__. Other factors will be adjusted later on.
 
 
 ### a) short description of data and look at the data
@@ -27,25 +28,26 @@ We are interested in fi there is an association between __total cost__ in dollar
 heart_disease <- read_csv("./data/HeartDisease.csv") %>% 
   mutate(gender = as.factor(gender),
          complications = as.factor(complications))
-head(heart_disease)
 ```
+
+__Overview__:  
 
 In this dataset, there are `r nrow(heart_disease)` observations of patients with `r ncol(heart_disease)` variables:  
 
-*  __id__: patient id
-*  __totalcost__: total cost ($) of patients who are diagnosed with heart disease
-*  __age__: age of patients
-*  __gender__: gender of patient
-*  __interventions__: number of interventions (integers)
-*  __drugs__: number of drugs the patients take.
+*  __id__: subscriber id
+*  __totalcost__: total cost ($) of claims by subscriber
+*  __age__: age of subscribers
+*  __gender__: gender of patient (1 = male, 0 = otherwise)
+*  __interventions__: total number of interventions or procedures carried out
+*  __drugs__: number of tracked drugs prescribed
 *  __ERvisits__: number of ER visits
-*  __complications__: number of complications
-*  __comorbidities__: number of co-presence of other diseases in additional to heart disease
-*  __duration__: duration of heart disease (in days)
+*  __complications__: number of complications that arose during heart disease treatment
+*  __comorbidities__: number of co-presence of other diseases
+*  __duration__: duration of treament condition (in days)
 
-Based our investigation interest, the main outcome is __total cost__ of patients with heart disease and the main predictor is __ERvisits__ (number of ER visits). Other important covariates also need to be considered because they could potentially have effect on the association relationship between our main predictor and main outcome, including age, interventions, drugs used, complications, and duration of disease. We will first take a look at the availible variables:
+Based our investigation interest, the main outcome is __total cost__ of subscribers with heart disease and the main predictor is __ERvisits__ (number of ER visits). Other important covariates also need to be considered because they could be confounders or have modifier effects on the association relationship between our main predictor and main outcome, including age, interventions, drugs used, complications, and duration of disease. We will first take a look at the availible variables:
 
-i) First we took a look at the main outcome and main predictor
+i) First we took a look at the distribution of each variable of interest
 
 ```{r number summary}
 variable_set1 <- dplyr::select(heart_disease, totalcost, ERvisits, everything(), 
@@ -55,7 +57,7 @@ knitr::kable(summary(variable_set1))
 knitr::kable(summary(variable_set2))
 ```
 
-Visualize the distribution of these variables:
+Visualize the distribution of variables:
 
 ```{r, fig.width=10}
 par(mfrow = c(1,2))
@@ -63,7 +65,8 @@ hist(variable_set1$totalcost, main = "histogram of total cost (outcome)")
 hist(variable_set1$ERvisits, main = "histogram of ER visits")
 ```
 
-Describe the main outcome and main predictor:  
+__Describe the main outcome and main predictor__:  
+
 Since total cost and ER visits are both heavily right skewed on the histograms, we better use median and IQR in the summay table to describe them. Especially for total cost, there are many extreme values at the right tail end which needed to be investigated further in the following analysis. We categorized two other remaining variables gender and complications as categorical variables. From the summary table, we saw 
 
 ```{r, fig.width=10}
@@ -75,7 +78,9 @@ hist(variable_set1$comorbidities, main = "histogram of comordities")
 hist(variable_set1$duration, main = "histogram of duration")
 ```
 
-Describe other covariables: age is slightly left skewed which means elder people have been overly sampled. The median of intervention is about 5 with large IQR of 5. drugs?. Commordities have median of 3.7 with large IQR 5. Duration of heart disease is roughly uniformly distributed from 50 to 350 days with median 165 days and IQR 240 days. Therefore, these co-variables are not normally distributed in the sample. We categorized two other remaining variables gender and complications as categorical variables. From the summary table, we saw one sex is oversampled (608). The majority of patients do not have any complications.
+__Describe other covariables__:  
+
+Age is slightly left skewed which means elder people have been overly sampled. The median of intervention is about 5 with large IQR = 5. Number of tracked drugs are right skewed so we better make it a categorical variable. Commordities have median of 3.7 with large IQR = 5. Duration of heart disease is roughly uniformly distributed from 50 to 350 days with median 165 days and IQR 240 days. Therefore, these co-variables are not normally distributed in the sample. We have categorized two other remaining variables gender and complications as categorical variables. From the summary table, we saw males are undersampled and other sexs are oversampled (608). The majority of patients do not have any complications.
 
 ### b) investigate the shape of distribution for total cost
 
@@ -128,7 +133,7 @@ The result of regression tells that the fitted model is :
 
 $$\hat{logY_{i}} = 5.517 + 0.23X_{i}$$
 
-Interpretation: The fitted model indicates that for every unit increase in ER visits, the expected total cost in dollars _on logarithm scale_ will increase by 0.23. When the ER visit is 0, the expected total cost in dollar _on logarithm scale_ will be 5.517. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
+__Results and Interpretation__: The fitted model indicates that for every unit increase in ER visits, the expected total cost in dollars _on logarithm scale_ will increase by 0.23, or 1.26 on original scale. When the ER visit is 0, the expected total cost in dollar _on logarithm scale_ will be 5.517, or 249 dollars. The p value for two estimators $\beta_{0}$ and $\beta_{1}$ are well below 0.001. So we are very confident that there is a strong association between total cost and ER visits, and our simple regression model describes their relationship.
 
 ### e) fit MLR with comp_bin and ERvisits
 
@@ -142,19 +147,20 @@ $logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2} + \epsilon_{i}$
 
 Now add a potential modifier (interaction):  
 
-$logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2}+ \beta_{3}X_{i1}X_{i2} + \epsilon_{i}$
+$logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2}+ \beta_{3}X_{i3}X_{i3} + \epsilon_{i}$
 
 Our hypothesis statement is:  $H_{0}: \beta_{3} = 0$ vs. $H_{a}: \beta_{3} \ne 0$
 
 ```{r modifier effect}
 MLR_comp <- lm(log_totalcost ~ ERvisits + comp_bin, data = heart_disease)
 MLR_comp_inter <- lm(log_totalcost ~ ERvisits + comp_bin + ERvisits*comp_bin, data = heart_disease)
-summary(MLR_comp_inter) %>% tidy %>% knitr::kable()
+summary(MLR_comp) 
+summary(MLR_comp_inter)
 anova(MLR_comp, MLR_comp_inter) %>% tidy
 ```
 
 
-Comment: Based on the regression summary and anova result, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. Anova F test for comparing two models indicate adding the interaction term does not increase SSR by significant amount. So at 0.95 significance level, we do not have evidence to reject the null. Therefore we is no interaction or modifier effect of complications in the relationship between total cost and ER visits.
+Comment: Based on the regression summary and anova result comparing two models, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. Anova F test for comparing two models indicate adding the interaction term does not increase SSR by significant amount. The adjusted $R^2$ is the same for these nested models. Therefore at 0.95 significance level, we do not have evidence to reject the null. Hence there is no significant interaction or modifier effect of complications in the relationship between total cost and ER visits.
 
 We can also visualize this interaction model:  
 
@@ -178,21 +184,19 @@ Comment: although we expect two parallel lines on the plot if there is truly no 
 
 ii) test if __comp_bin__ is a confounder of relationship between total cost and ERvisits
 
-Model 1 without comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i} + \epsilon_{i}$  
+Model 1 without comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i1} + \epsilon_{i}$  
 
 Model 2 with comp_bin:  $logY_{i} = \beta_0 + \beta_{1}X_{i1} + \beta_{2}X_{i2} + \epsilon_{i}$
 
 ```{r}
-comp_ER <- cor(heart_disease$comp_bin, heart_disease$ERvisits)
-comp_total <- cor(heart_disease$comp_bin, heart_disease$log_totalcost)
 SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease)
 MLR_comp <- lm(log_totalcost ~ ERvisits + factor(comp_bin), data = heart_disease)
-SLR %>% tidy %>% knitr::kable()
-MLR_comp %>% tidy %>% knitr::kable()
-anova(SLR, MLR_comp)
+summary(SLR) 
+summary(MLR_comp)
+anova(SLR, MLR_comp) %>% tidy
 ```
 
-Comment: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
+Comment: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. If we calculate the F statistics for this nested model: $F = \frac{(SSR_{large} - SSR_{small})/1}{SSE_{large}/785} = \frac{116.6}{2464.668/785} = 37.14 \sim F(1, 785)$, then we will reject the null at 0.05 level since this test statistics is very large. In addition, the adjusted $R^2$ increased when adjusting for __comp_bin__. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
 
 iii) decide if comp_bin should be included along with ERvisits
 
@@ -202,7 +206,7 @@ From above test, we should include __comp_bin__ as a predictor in our additive l
 
 (i)  fit a MLR  
 
-We start with screen for any colinearility of variables among __ERvisits__, __comp_bin__, __age__, __gender__, and __duration__
+We start with screening for any colinearility of variables among __ERvisits__, __comp_bin__, __age__, __gender__, and __duration__
 
 ```{r}
 heart_disease %>% dplyr::select(log_totalcost, ERvisits, comp_bin, age, gender, duration) %>% pairs()
@@ -213,30 +217,56 @@ Then we fit a MLR with all variables of interests:
 ```{r}
 fit_all <- lm(log_totalcost ~ ERvisits + comp_bin + age + factor(gender) + duration, 
               data = heart_disease)
-summary(fit_all) 
 vif(fit_all)
+summary(fit_all)
+anova(fit_all) 
 ```
 
-Comment: From the VIF test, there is no significant colinearity between predictors. Based on the t test statistics for each regression coefficients along with their p values, we observe linear relationship between gender and total cost is weak. Then we will perform ANOVA test and make decision.
+__Comment__: From the VIF test, there is no significant colinearity between predictors. Based on the t test statistics for each regression coefficients along with their p values, we observed linear relationship between gender and total cost is weak. The adjusted $R^2$ for this full model is about 0.26. Then we performed ANOVA test. From F test for each nested model indicate that we should definitely include __duration__ in our model and better exclude age and gender since they do not much additional information in the exisiting model. But we still need to decide which combinations of predictors will provide the best association between predictors and outcomes. So we run into the stage of model selection:
 
 (ii) compare SLR and MLR  
 
 Here we construct several nested MLR to determine if we want to include the predicor in the model or not.
 
-```{r}
-anova(fit_all)
-```
-
-Comment: From F test for each nested model indicate that we should definitely include __duration__ in our model and better exclude age and gender since they do not much additional information in the exisiting model. Therefore from all above analysis, we come up with a fitted model of main outcome with its main predictor along with other covariates is the follow:  
 
 ```{r}
-MLR_final <- lm(log_totalcost ~ ERvisits + comp_bin + duration, 
-              data = heart_disease)
-summary(MLR_final)
+SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease) # start from here
+heart <- heart_disease %>% dplyr::select(ERvisits, comp_bin, duration, age, gender,log_totalcost)
 ```
 
+compare different models using both adjusted $R^2$ and Cp criterion. 
 
-total cost (log) = 4.7 + 0.17ERvisit + 1.55comp_bin + 0.0056duration
+```{r}
+MLRs <- regsubsets(log_totalcost ~ ., data=heart)
+summary(MLRs)
+``` 
+
+So we have the best models for each size of predictors in terms of Cp and adjusted $R^2$, we can build models for each of them
+
+```{r}
+modelfit_1 <- lm(log_totalcost ~ duration, data = heart)
+modelfit_2 <- lm(log_totalcost ~ ERvisits + duration, data = heart)
+modelfit_3 <- lm(log_totalcost ~ ERvisits + comp_bin + duration, data = heart)
+modelfit_4 <- lm(log_totalcost ~ ERvisits + comp_bin + duration + age, data = heart)
+modelfit_5 <- lm(log_totalcost ~ ERvisits + comp_bin + duration + age + factor(gender), data = heart)
+model_result <- tibble(predictors = c(1,2,3,4,5),
+       data = list(modelfit_1, modelfit_2, modelfit_3, modelfit_4, modelfit_5))
+```
+
+them compare their AIC and BIC
+
+```{r}
+compare_models <- model_result %>% mutate(glance_result = map(data, glance)) %>% 
+  dplyr::select(-data) %>% 
+  unnest() %>% 
+  dplyr::select(predictors, AIC, BIC, adj.r.squared)
+
+plot(compare_models$predictors, compare_models$adj.r.squared)                        
+```
+
+Comment: the adjusted $R^2$ does not change much after 3 predictors. so we will use the three predictors: ERvisit, comp_bin and duration.
+
+
 
 ## Problem 3
 
