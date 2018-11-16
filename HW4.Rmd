@@ -1,7 +1,7 @@
 ---
 title: "p8130 HW4 Regression"
 author: "Eleanor Zhang"
-date: "11/11/2018"
+date: "11/15/2018"
 geometry: margin=2cm
 output: 
      pdf_document:
@@ -103,7 +103,7 @@ qqnorm(heart_disease$log_totalcost)
 qqline(heart_disease$log_totalcost, col = "red", lwd = 2)
 ```
 
-Comment: After log transformation, we saw a pretty good bell shaped ditribution. So we will use this transformed data in the linear model fitting and interpretation.
+__Comment__: After log transformation, we saw a pretty good bell shaped ditribution. So we will use this transformed data in the linear model fitting and interpretation.
 
 
 ### c) dichotomize complications
@@ -160,7 +160,7 @@ anova(MLR_comp, MLR_comp_inter) %>% tidy
 ```
 
 
-Comment: Based on the regression summary and anova result comparing two models, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. Anova F test for comparing two models indicate adding the interaction term does not increase SSR by significant amount. The adjusted $R^2$ is the same for these nested models. Therefore at 0.95 significance level, we do not have evidence to reject the null. Hence there is no significant interaction or modifier effect of complications in the relationship between total cost and ER visits.
+__Comment__: Based on the regression summary and anova result comparing two models, p value for the interaction coefficient $\beta_{3}$ is 0.314, which is quite large. Anova F test for comparing two models indicate adding the interaction term does not increase SSR by significant amount. The adjusted $R^2$ is the same for these nested models. Therefore at 0.95 significance level, we do not have evidence to reject the null. Hence there is no significant interaction or modifier effect of complications in the relationship between total cost and ER visits.
 
 We can also visualize this interaction model:  
 
@@ -180,7 +180,7 @@ lines(ER, yhat1, col = 2, lwd = 2) # total cost of comp_bin = 0 with fixed ER
 lines(ER, yhat2, col = 3, lwd = 2) # total cost of comp_bin greater than 0 with fixed ER
 ```
 
-Comment: although we expect two parallel lines on the plot if there is truly no interaction effect. However, the statistical test we conducted above indicate that although there is some interaction effect, the effect is not significant. As a conclusion, we will not consider this mediator effect.
+__Comment__: although we expect two parallel lines on the plot if there is truly no interaction effect. However, the statistical test we conducted above indicate that although there is some interaction effect, the effect is not significant. As a conclusion, we will not consider this mediator effect.
 
 ii) test if __comp_bin__ is a confounder of relationship between total cost and ERvisits
 
@@ -196,7 +196,7 @@ summary(MLR_comp)
 anova(SLR, MLR_comp) %>% tidy
 ```
 
-Comment: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. If we calculate the F statistics for this nested model: $F = \frac{(SSR_{large} - SSR_{small})/1}{SSE_{large}/785} = \frac{116.6}{2464.668/785} = 37.14 \sim F(1, 785)$, then we will reject the null at 0.05 level since this test statistics is very large. In addition, the adjusted $R^2$ increased when adjusting for __comp_bin__. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
+__Comment__: From the regression result, we saw the coefficient of __comp_bin__ is quite significant with p value well below 0.001. If we calculate the F statistics for this nested model: $F = \frac{(SSR_{large} - SSR_{small})/1}{SSE_{large}/785} = \frac{116.6}{2464.668/785} = 37.14 \sim F(1, 785)$, then we will reject the null at 0.05 level since this test statistics is very large. In addition, the adjusted $R^2$ increased when adjusting for __comp_bin__. The anova result for two model comparison shows that adding complication variable greatly reduce the overall SSTO while increasing SSR, with p value well below 0.001. So we should include complications in our linear model.
 
 iii) decide if comp_bin should be included along with ERvisits
 
@@ -234,14 +234,14 @@ SLR <- lm(log_totalcost ~ ERvisits, data = heart_disease) # start from here
 heart <- heart_disease %>% dplyr::select(ERvisits, comp_bin, duration, age, gender,log_totalcost)
 ```
 
-compare different models using both adjusted $R^2$ and Cp criterion. 
+Find the best model using both adjusted $R^2$ and Cp criterion for each size of predictors 
 
 ```{r}
 MLRs <- regsubsets(log_totalcost ~ ., data=heart)
 summary(MLRs)
 ``` 
 
-So we have the best models for each size of predictors in terms of Cp and adjusted $R^2$, we can build models for each of them
+So we have the best models for each size of predictors in terms of Cp and adjusted $R^2$. Then we can build models for each of them:
 
 ```{r}
 modelfit_1 <- lm(log_totalcost ~ duration, data = heart)
@@ -253,19 +253,22 @@ model_result <- tibble(predictors = c(1,2,3,4,5),
        data = list(modelfit_1, modelfit_2, modelfit_3, modelfit_4, modelfit_5))
 ```
 
-them compare their AIC and BIC
+them compare their AIC, BIC, and adjusted $R^2$
 
 ```{r}
 compare_models <- model_result %>% mutate(glance_result = map(data, glance)) %>% 
   dplyr::select(-data) %>% 
   unnest() %>% 
   dplyr::select(predictors, AIC, BIC, adj.r.squared)
+knitr::kable(compare_models)
 
-plot(compare_models$predictors, compare_models$adj.r.squared)                        
+plot(compare_models$predictors, compare_models$adj.r.squared)   
+summary(modelfit_3) %>% tidy
 ```
 
-Comment: the adjusted $R^2$ does not change much after 3 predictors. so we will use the three predictors: ERvisit, comp_bin and duration.
+__Comment__: Since the investigators are primarily interested in the assoication between total cost and ER visits while adjusting for other covariates, our model choice should better rely on adjusted coefficient of determination which describes the goodness of fit of the model. The adjusted $R^2$ does not change much after the 3 predictors model. so we will use the three predictors: __ERvisit__, __comp_bin__ and __duration__. So our model becomes:  
 
+__total cost (log) ~ 0.17ERvisits + 1.545comp_bin + 0.0056duration__
 
 
 ## Problem 3
@@ -280,7 +283,7 @@ pairs(pat_sat)
 cor(pat_sat) %>% knitr::kable()
 ```
 
-Comment: the correlation matrix shows that age, severity of illness and anxiety level are consistently negatively correlated with satisfaction score. Age seems to have the strongest correlation with satisfaction score while the other variables also have significant coefficient of correlations. However, covariates are positively correlated with each other significantly as well. So we should keep this in mind.
+__Comment__: the correlation matrix shows that age, severity of illness and anxiety level are consistently negatively correlated with satisfaction score. Age seems to have the strongest correlation with satisfaction score while the other variables also have significant coefficient of correlations. However, covariates are positively correlated with each other significantly as well. So we should keep this in mind.
 
 ### b) fit a MLR and test whether there is a regression relation
 
@@ -330,7 +333,7 @@ new_data <- tibble(Age = 35,
 predict.lm(MLR_all, new_data, interval="prediction", conf.level = 0.95)
 ```
 
-Comment: The point estimator for this new patient's satisfaction score is 71.7. We are 95% confident that the predicted satisfaction score for this new patient will be between 50.1 to 93.3
+__Comment__: The point estimator for this new patient's satisfaction score is 71.7. We are 95% confident that the predicted satisfaction score for this new patient will be between 50.1 to 93.3
 
 ### e) test whether anxiety level can be dropped from the MLR
 
